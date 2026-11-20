@@ -42,3 +42,34 @@ Artisan::command('mansur:check-public', function () {
 
     return $ok ? 0 : 1;
 })->purpose('Проверить, что сайт безопасно открывать в интернет');
+
+// php artisan mansur:admin-password — задать новый пароль администратору, если старый забыт.
+// Пароль вводится скрыто (не виден на экране и не попадает в историю команд), сохраняется как bcrypt-хеш.
+Artisan::command('mansur:admin-password {email? : email администратора}', function () {
+    $admins = User::where('role', User::ROLE_ADMIN)->orderBy('id')->get();
+    $email = $this->argument('email') ?: ($admins->count() === 1 ? $admins->first()->email
+        : $this->choice('Какому администратору сменить пароль?', $admins->pluck('email')->all()));
+    $user = $admins->firstWhere('email', $email);
+    if (! $user) {
+        $this->error("Администратор {$email} не найден.");
+
+        return 1;
+    }
+    $this->info("Администратор: {$user->email}");
+    $password = $this->secret('Новый пароль (не короче 8 символов, ввод не отображается)');
+    if (mb_strlen((string) $password) < 8) {
+        $this->error('Пароль короче 8 символов — ничего не изменено.');
+
+        return 1;
+    }
+    if ($this->secret('Повторите пароль') !== $password) {
+        $this->error('Пароли не совпали — ничего не изменено.');
+
+        return 1;
+    }
+    $user->forceFill(['password' => $password])->save(); // хешируется автоматически (cast 'hashed')
+    $user->tokens()->delete(); // старые входы на всех устройствах завершаются
+    $this->info('Пароль изменён. Войдите на сайте: '.$user->email);
+
+    return 0;
+})->purpose('Задать новый пароль администратору');
