@@ -1,0 +1,48 @@
+<?php
+
+return [
+    'after_or_equal' => 'Поле «:attribute» должно быть датой не раньше :date.',
+    'alpha_dash' => 'Поле «:attribute» может содержать только буквы, цифры, дефис и подчёркивание.',
+    'array' => 'Поле «:attribute» должно быть списком.',
+    'boolean' => 'Поле «:attribute» должно быть да/нет.',
+    'current_password' => 'Неверный текущий пароль.',
+    'date' => 'Поле «:attribute» должно быть датой.',
+    'email' => 'Поле «:attribute» должно быть корректным email.',
+    'exists' => 'Выбранное значение поля «:attribute» не найдено.',
+    'in' => 'Недопустимое значение поля «:attribute».',
+    'integer' => 'Поле «:attribute» должно быть целым числом.',
+    'max' => [
+        'array' => 'В поле «:attribute» не больше :max элементов.',
+        'numeric' => 'Поле «:attribute» не может быть больше :max.',
+        'string' => 'Поле «:attribute» не может быть длиннее :max символов.',
+    ],
+    'min' => [
+        'array' => 'В поле «:attribute» не меньше :min элементов.',
+        'numeric' => 'Поле «:attribute» не может быть меньше :min.',
+        'string' => 'Поле «:attribute» должно быть не короче :min символов.',
+    ],
+    'present' => 'Поле «:attribute» должно присутствовать.',
+    'required' => 'Заполните поле «:attribute».',
+    'required_with' => 'Заполните поле «:attribute».',
+    'string' => 'Поле «:attribute» должно быть строкой.',
+    'unique' => 'Такое значение поля «:attribute» уже занято.',
+
+    'attributes' => [
+        'name' => 'Имя',
+        'email' => 'Email',
+        'password' => 'Пароль',
+        'current_password' => 'Текущий пароль',
+        'title' => 'Название',
+        'content' => 'Сообщение',
+        'prompt' => 'Задание',
+        'workspace' => 'Рабочая папка',
+        'ai_model_id' => 'Нейросеть',
+        'slug' => 'Код',
+        'provider' => 'Провайдер',
+        'model' => 'Модель',
+        'type' => 'Тип',
+        'daily_limit' => 'Дневной лимит',
+        'date_from' => 'Дата с',
+        'date_to' => 'Дата по',
+    ],
+];

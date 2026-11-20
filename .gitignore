@@ -1,0 +1,31 @@
+# Библиотеки — восстанавливаются командами composer install / npm install, в git их не кладут
+node_modules/
+server/vendor/
+
+# Сборка Windows-приложения и установщик (большие файлы, собираются build-app.bat)
+desktop/dist/
+server/public/downloads/*.exe
+
+# Секреты и локальные настройки
+.env
+server/.env
+*.key
+
+# Локальная база данных PostgreSQL (в ней данные пользователей!) и служебные программы
+runtime/pgdata/
+runtime/pgpass.txt
+runtime/cloudflared.exe
+runtime/composer.phar
+runtime/*.log
+
+# Файлы, которые создаёт сервер во время работы (картинки, фоны пользователей, кеш, логи)
+server/storage/app/public/*
+!server/storage/app/public/.gitignore
+server/public/storage
+*.log
+
+# Мусор редакторов и Windows
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
