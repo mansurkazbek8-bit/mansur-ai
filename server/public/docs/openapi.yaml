@@ -1,0 +1,371 @@
+openapi: 3.0.3
+info:
+  title: Mansur AI — REST API
+  version: 1.0.0
+  description: |
+    Серверная часть ИИ-платформы Mansur AI (Laravel 13, PostgreSQL, Sanctum).
+    Все ответы — JSON. Ошибки: `{"message": "...", "errors": {...}}`.
+    Авторизация: заголовок `Authorization: Bearer <token>` (токен выдают /login и /register).
+    Токен сайта имеет право `user`, токен Windows-приложения (`client: desktop`) — `user` и `agent`.
+servers:
+  - url: /api
+tags:
+  - name: Аутентификация
+  - name: Нейросети
+  - name: Чаты
+  - name: Задачи агенту
+  - name: Windows-агент
+  - name: Администратор
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: { type: string, example: Дневной лимит модели «Mansur Chat» исчерпан }
+        errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [user, admin] }
+        is_blocked: { type: boolean }
+        created_at: { type: string, format: date-time }
+    AiModel:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string, example: mansur-chat }
+        name: { type: string, example: Mansur Chat }
+        provider: { type: string, example: pollinations }
+        type: { type: string, enum: [text, image, agent] }
+        description: { type: string }
+        daily_limit: { type: integer, example: 100 }
+        is_active: { type: boolean }
+    Message:
+      type: object
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string }
+        image_url: { type: string, nullable: true }
+        status: { type: string, enum: [ok, failed] }
+        ai_model_id: { type: integer }
+        model_name: { type: string }
+        created_at: { type: string, format: date-time }
+    Chat:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        ai_model_id: { type: integer }
+        model: { $ref: '#/components/schemas/AiModel' }
+        messages: { type: array, items: { $ref: '#/components/schemas/Message' } }
+        messages_count: { type: integer }
+        updated_at: { type: string, format: date-time }
+    AgentTask:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        prompt: { type: string }
+        workspace: { type: string, nullable: true }
+        status: { type: string, enum: [queued, running, completed, failed, cancelled] }
+        result: { type: string, nullable: true }
+        log: { type: array, items: { type: object, properties: { type: { type: string }, text: { type: string }, at: { type: string } } } }
+        log_count: { type: integer }
+        started_at: { type: string, nullable: true }
+        finished_at: { type: string, nullable: true }
+    Usage:
+      type: object
+      properties:
+        ai_model_id: { type: integer }
+        name: { type: string }
+        daily_limit: { type: integer }
+        used: { type: integer }
+        remaining: { type: integer }
+  responses:
+    Unauthorized: { description: Нет токена или он недействителен, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Нет прав / аккаунт заблокирован / чужой ресурс, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Не найдено, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Validation: { description: Ошибка валидации, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Недопустимый переход статуса, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  parameters:
+    chat: { name: chat, in: path, required: true, schema: { type: integer } }
+    task: { name: task, in: path, required: true, schema: { type: integer } }
+security:
+  - bearer: []
+paths:
+  /register:
+    post:
+      tags: [Аутентификация]
+      summary: Регистрация
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string, minLength: 8 }
+                client: { type: string, enum: [web, desktop] }
+      responses:
+        '201': { description: Аккаунт создан, content: { application/json: { schema: { type: object, properties: { user: { $ref: '#/components/schemas/User' }, token: { type: string } } } } } }
+        '422': { $ref: '#/components/responses/Validation' }
+  /login:
+    post:
+      tags: [Аутентификация]
+      summary: Вход, выдача токена Sanctum
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+                client: { type: string, enum: [web, desktop], description: desktop — токен с правом agent }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { user: { $ref: '#/components/schemas/User' }, token: { type: string } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /oauth/providers:
+    get: { tags: [Аутентификация], summary: 'Сервисы входа, настроенные администратором (google, github, apple)', security: [], responses: { '200': { description: OK } } }
+  /oauth/exchange:
+    post:
+      tags: [Аутентификация]
+      summary: Обмен одноразового кода входа через Google / GitHub / Apple на токен
+      description: |
+        Вход начинается в браузере по адресу `/auth/{provider}?client=web` (или `client=desktop&port=N` для Windows-приложения).
+        После подтверждения сервер перенаправляет на `/?oauth_code=…` (сайт) или `http://127.0.0.1:N/?code=…` (приложение).
+        Код одноразовый и действует 2 минуты.
+      security: []
+      requestBody: { content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { user: { $ref: '#/components/schemas/User' }, token: { type: string } } } } } }
+        '422': { $ref: '#/components/responses/Validation' }
+  /logout:
+    post: { tags: [Аутентификация], summary: Выход (удалить текущий токен), responses: { '204': { description: OK }, '401': { $ref: '#/components/responses/Unauthorized' } } }
+  /logout-all:
+    post: { tags: [Аутентификация], summary: Выход на всех устройствах, responses: { '204': { description: OK } } }
+  /forgot-password:
+    post:
+      tags: [Аутентификация]
+      summary: 'Забыли пароль: письмо со ссылкой (ответ одинаковый для любого email; не более 10 попыток в минуту)'
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
+      responses: { '200': { description: Письмо отправлено, если аккаунт есть }, '429': { description: Слишком много попыток }, '503': { description: Почта не настроена администратором } }
+  /reset-password:
+    post:
+      tags: [Аутентификация]
+      summary: Новый пароль по ссылке из письма; все прежние сеансы завершаются, выдаётся новый токен
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token, email, password, password_confirmation], properties: { token: { type: string }, email: { type: string }, password: { type: string, minLength: 8 }, password_confirmation: { type: string } } } } } }
+      responses: { '200': { description: '{ user, token }' }, '422': { description: Ссылка устарела или пароль не подходит } }
+  /ping:
+    post: { tags: [Аутентификация], summary: 'Открытая вкладка сайта сообщает «я онлайн» (раз в минуту)', responses: { '204': { description: OK } } }
+  /me:
+    get:
+      tags: [Аутентификация]
+      summary: Текущий пользователь и остатки лимитов
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { user: { $ref: '#/components/schemas/User' }, usage: { type: array, items: { $ref: '#/components/schemas/Usage' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Аутентификация]
+      summary: Изменить профиль
+      requestBody: { content: { application/json: { schema: { type: object, properties: { name: { type: string }, current_password: { type: string }, password: { type: string } } } } } }
+      responses: { '200': { description: OK }, '422': { $ref: '#/components/responses/Validation' } }
+  /models:
+    get:
+      tags: [Нейросети]
+      summary: Каталог доступных нейросетей (для гостя тоже)
+      security: []
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AiModel' } } } } } } } }
+  /usage:
+    get: { tags: [Нейросети], summary: Остаток бесплатных запросов на сегодня, responses: { '200': { description: OK } } }
+  /app:
+    get: { tags: [Нейросети], summary: Информация о Windows-приложении (версия, ссылка), security: [], responses: { '200': { description: OK } } }
+  /chats:
+    get:
+      tags: [Чаты]
+      summary: Мои чаты — поиск и фильтрация
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: Поиск по названию и тексту сообщений }
+        - { name: ai_model_id, in: query, schema: { type: integer } }
+        - { name: date_from, in: query, schema: { type: string, format: date } }
+        - { name: date_to, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses: { '200': { description: Постраничный список, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Chat' } } } } } } } }
+    post:
+      tags: [Чаты]
+      summary: Создать чат
+      requestBody: { content: { application/json: { schema: { type: object, required: [ai_model_id], properties: { title: { type: string }, ai_model_id: { type: integer } } } } } }
+      responses: { '201': { description: Создан }, '422': { $ref: '#/components/responses/Validation' } }
+  /chats/{chat}:
+    parameters: [{ $ref: '#/components/parameters/chat' }]
+    get: { tags: [Чаты], summary: Чат с сообщениями, responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:
+      tags: [Чаты]
+      summary: Переименовать / сменить нейросеть
+      requestBody: { content: { application/json: { schema: { type: object, properties: { title: { type: string }, ai_model_id: { type: integer } } } } } }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+    delete: { tags: [Чаты], summary: Удалить чат, responses: { '204': { description: Удалён }, '403': { $ref: '#/components/responses/Forbidden' } } }
+  /chats/{chat}/messages:
+    parameters: [{ $ref: '#/components/parameters/chat' }]
+    post:
+      tags: [Чаты]
+      summary: 'Ключевой сценарий 1: отправить сообщение нейросети с проверкой дневного лимита'
+      description: Проверки — токен (401), блокировка и владелец чата (403/404), валидация (422), активность модели (422), лимит (429). При сбое нейросети лимит не списывается (502).
+      requestBody: { content: { application/json: { schema: { type: object, required: [content], properties: { content: { type: string, maxLength: 8000 }, ai_model_id: { type: integer, description: Сменить модель для этого и следующих сообщений } } } } } }
+      responses:
+        '201': { description: Ответ нейросети, content: { application/json: { schema: { type: object, properties: { user_message: { $ref: '#/components/schemas/Message' }, assistant_message: { $ref: '#/components/schemas/Message' }, remaining: { type: integer } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Validation' }
+        '429': { description: Дневной лимит исчерпан }
+        '502': { description: Нейросеть не ответила }
+  /agent-tasks:
+    get:
+      tags: [Задачи агенту]
+      summary: Мои задачи (фильтр по статусу)
+      parameters: [{ name: status, in: query, schema: { type: string, enum: [queued, running, completed, failed, cancelled] } }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Задачи агенту]
+      summary: 'Ключевой сценарий 2: создать задачу для Windows-агента'
+      requestBody: { content: { application/json: { schema: { type: object, required: [prompt], properties: { title: { type: string }, prompt: { type: string }, workspace: { type: string } } } } } }
+      responses: { '201': { description: Создана (queued) }, '422': { description: Больше 3 незавершённых задач или ошибка валидации } }
+  /agent-tasks/{task}:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    get: { tags: [Задачи агенту], summary: Задача с журналом, responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AgentTask' } } } } } } } }
+  /agent-tasks/{task}/cancel:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    post: { tags: [Задачи агенту], summary: Отменить (только queued/running), responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+  /agent/tasks:
+    get:
+      tags: [Windows-агент]
+      summary: Задачи для выполнения (по умолчанию queued)
+      parameters: [{ name: status, in: query, schema: { type: string } }]
+      responses: { '200': { description: OK }, '403': { description: Токен без права agent } }
+  /agent/tasks/{task}/status:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    get: { tags: [Windows-агент], summary: Текущий статус (проверка отмены), responses: { '200': { description: OK } } }
+  /agent/tasks/{task}/start:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    post: { tags: [Windows-агент], summary: queued → running, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+  /agent/tasks/{task}/logs:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    post:
+      tags: [Windows-агент]
+      summary: Добавить записи в журнал (только running)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { entries: { type: array, items: { type: object, properties: { type: { type: string, enum: [info, thought, tool, result, error] }, text: { type: string } } } } } } } } }
+      responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } }
+  /agent/tasks/{task}/complete:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    post: { tags: [Windows-агент], summary: running → completed, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+  /agent/tasks/{task}/fail:
+    parameters: [{ $ref: '#/components/parameters/task' }]
+    post: { tags: [Windows-агент], summary: running → failed, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+  /agent/step:
+    post:
+      tags: [Windows-агент]
+      summary: Один шаг рассуждения агента (сообщения + инструменты → ответ модели)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { messages: { type: array, items: { type: object } }, tools: { type: array, items: { type: object } } } } } } }
+      responses: { '200': { description: Сообщение модели с tool_calls }, '429': { description: Лимит агента исчерпан }, '502': { description: Нейросеть не ответила } }
+  /agent/image:
+    post:
+      tags: [Windows-агент]
+      summary: Сгенерировать изображение для проекта
+      requestBody: { content: { application/json: { schema: { type: object, required: [prompt], properties: { prompt: { type: string }, width: { type: integer }, height: { type: integer } } } } } }
+      responses: { '201': { description: '{ url }' } }
+  /admin/models:
+    get: { tags: [Администратор], summary: Все нейросети и провайдеры, responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } } }
+    post:
+      tags: [Администратор]
+      summary: Добавить нейросеть
+      requestBody: { content: { application/json: { schema: { type: object, required: [slug, name, provider, model, type, daily_limit], properties: { slug: { type: string }, name: { type: string }, provider: { type: string }, model: { type: string }, type: { type: string }, description: { type: string }, system_prompt: { type: string }, daily_limit: { type: integer }, is_active: { type: boolean }, sort: { type: integer } } } } } }
+      responses: { '201': { description: Создана }, '422': { $ref: '#/components/responses/Validation' } }
+  /admin/models/{aiModel}:
+    parameters: [{ name: aiModel, in: path, required: true, schema: { type: integer } }]
+    patch: { tags: [Администратор], summary: Изменить (лимит, активность и т. д.), responses: { '200': { description: OK } } }
+    delete: { tags: [Администратор], summary: Удалить, responses: { '204': { description: OK } } }
+  /admin/users:
+    get:
+      tags: [Администратор]
+      summary: Пользователи (поиск)
+      parameters: [{ name: q, in: query, schema: { type: string } }, { name: blocked, in: query, schema: { type: boolean } }]
+      responses: { '200': { description: OK } }
+  /admin/users/{user}/block:
+    parameters: [{ name: user, in: path, required: true, schema: { type: integer } }]
+    post: { tags: [Администратор], summary: Заблокировать (токены удаляются), responses: { '200': { description: OK } } }
+  /admin/users/{user}/unblock:
+    parameters: [{ name: user, in: path, required: true, schema: { type: integer } }]
+    post: { tags: [Администратор], summary: Разблокировать, responses: { '200': { description: OK } } }
+  /admin/stats:
+    get:
+      tags: [Администратор]
+      summary: 'Статистика: онлайн сейчас (сайт / приложение), регистрации, покупки, запросы по моделям и дням'
+      parameters: [{ name: date_from, in: query, schema: { type: string, format: date } }, { name: date_to, in: query, schema: { type: string, format: date } }]
+      responses: { '200': { description: OK } }
+  /admin/purchases:
+    get:
+      tags: [Администратор]
+      summary: Кто какого агента купил, когда и за сколько; итоги по агентам
+      parameters: [{ name: q, in: query, description: Поиск покупателя, schema: { type: string } }]
+      responses: { '200': { description: '{ data, meta, summary }' } }
+  /admin/mail:
+    get: { tags: [Администратор], summary: Настройки почты SMTP (пароль не возвращается), responses: { '200': { description: OK } } }
+    put:
+      tags: [Администратор]
+      summary: Сохранить настройки почты (пустой пароль сохраняет прежний; clear=true — удалить)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { host: { type: string }, port: { type: integer, enum: [25, 465, 587, 2525] }, username: { type: string }, password: { type: string }, from_address: { type: string }, from_name: { type: string }, clear: { type: boolean } } } } } }
+      responses: { '200': { description: OK }, '422': { $ref: '#/components/responses/Validation' } }
+  /admin/mail/test:
+    post:
+      tags: [Администратор]
+      summary: Отправить тестовое письмо
+      requestBody: { content: { application/json: { schema: { type: object, required: [to], properties: { to: { type: string, format: email } } } } } }
+      responses: { '200': { description: Отправлено }, '422': { description: Ошибка отправки с причиной } }
+  /admin/social:
+    get: { tags: [Администратор], summary: 'Настройки входа через Google / GitHub / Apple (секреты не возвращаются)', responses: { '200': { description: OK } } }
+  /admin/social/{provider}:
+    parameters: [{ name: provider, in: path, required: true, schema: { type: string, enum: [google, github, apple] } }]
+    put:
+      tags: [Администратор]
+      summary: Сохранить ключи OAuth-приложения (пустое поле секрета сохраняет прежнее значение; clear=true — отключить)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { client_id: { type: string }, client_secret: { type: string }, team_id: { type: string }, key_id: { type: string }, private_key: { type: string }, clear: { type: boolean } } } } } }
+      responses: { '200': { description: '{ configured }' }, '422': { $ref: '#/components/responses/Validation' } }
+  /agents:
+    get:
+      tags: [Windows-агент]
+      summary: 'Команда агентов: 5 персонажей, какие куплены, чем заняты, цена следующего (доступно и гостю)'
+      security: []
+      responses: { '200': { description: '{ owned, max, next_price, currency, payment_mode, agents[] }' } }
+  /agents/buy:
+    post:
+      tags: [Windows-агент]
+      summary: 'Купить следующего агента (2-й — 3000 ₸, 3-й — 4000 ₸, 4-й — 5000 ₸, 5-й — 6000 ₸; покупка разовая)'
+      responses: { '201': { description: Агент добавлен }, '401': { $ref: '#/components/responses/Unauthorized' }, '422': { $ref: '#/components/responses/Validation' } }
+  /admin/users/{user}/agents:
+    parameters: [{ name: user, in: path, required: true, schema: { type: integer } }]
+    put:
+      tags: [Администратор]
+      summary: Подарить или забрать агентов (задать размер команды 1–5)
+      requestBody: { content: { application/json: { schema: { type: object, required: [count], properties: { count: { type: integer, minimum: 1, maximum: 5 } } } } } }
+      responses: { '200': { description: OK } }
+  /agent/tasks/{task}/slot:
+    parameters: [{ name: task, in: path, required: true, schema: { type: integer } }]
+    post:
+      tags: [Windows-агент]
+      summary: 'Режим «Вместе»: руководитель отдаёт своего агента команде (slot = null) или забирает свободного для финальной проверки'
+      requestBody: { content: { application/json: { schema: { type: object, properties: { slot: { type: integer, nullable: true } } } } } }
+      responses: { '200': { description: OK }, '409': { description: Агент занят или задача не выполняется } }
