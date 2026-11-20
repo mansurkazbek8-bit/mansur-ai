@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: http: https:; media-src 'self' blob: http: https:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Mansur AI</title>
+  <link rel="stylesheet" href="vendor/hljs-dark.min.css">
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<!-- resize edges (the window has no system frame) -->
+<div id="resize-handles">
+  <div class="rh" data-edge="n"></div><div class="rh" data-edge="s"></div><div class="rh" data-edge="e"></div><div class="rh" data-edge="w"></div>
+  <div class="rh" data-edge="ne"></div><div class="rh" data-edge="nw"></div><div class="rh" data-edge="se"></div><div class="rh" data-edge="sw"></div>
+</div>
+<div id="window-root">
+  <!-- macOS-style title bar -->
+  <header class="titlebar" id="titlebar">
+    <div class="tb-title"><img src="../assets/icon.png" alt="">Mansur AI</div>
+    <div class="tb-right" id="tb-user"></div>
+    <div class="lights">
+      <button class="wb" id="tl-min" title="Свернуть"><svg viewBox="0 0 10 10"><path d="M0 5.5h10"/></svg></button>
+      <button class="wb" id="tl-max" title="Развернуть"><svg viewBox="0 0 10 10" id="max-icon"><rect x="0.5" y="0.5" width="9" height="9"/></svg></button>
+      <button class="wb wb-close" id="tl-close" title="Закрыть"><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10"/></svg></button>
+    </div>
+  </header>
+
+  <!-- login -->
+  <section id="login-screen" class="login hidden">
+    <form id="login-form" class="login-card">
+      <div class="brand"><img src="../assets/icon.png" alt=""> <span>Mansur AI</span></div>
+      <p class="muted">Войдите тем же аккаунтом, что и на сайте, — чаты, задачи и оформление синхронизируются. Нет аккаунта? Нажмите «Регистрация».</p>
+      <div class="seg"><button type="button" class="active" data-mode="login">Вход</button><button type="button" data-mode="register">Регистрация</button></div>
+      <label class="field reg-only hidden"><span>Имя</span><input class="input" name="name" maxlength="100"></label>
+      <label class="field"><span>Email</span><input class="input" type="email" name="email" required></label>
+      <label class="field"><span>Пароль <span class="reg-only hidden">(не короче 8 символов)</span></span><input class="input" type="password" name="password" required></label>
+      <p class="small login-only" style="margin:-4px 0 8px;text-align:right"><a href="#" id="login-forgot">Забыли пароль?</a></p>
+      <details class="small"><summary class="muted">Адрес сервера</summary><input class="input" name="server" style="margin-top:6px"></details>
+      <div class="error-text" id="login-err"></div>
+      <button class="btn btn-primary btn-block" type="submit" id="login-btn">Войти</button>
+      <div id="social-login" class="hidden">
+        <div class="social-sep"><span>или через</span></div>
+        <div class="social-btns"></div>
+        <p class="muted small hidden" id="social-wait" style="text-align:center;margin:10px 0 0">Завершите вход в открывшемся браузере… <a href="#" id="social-cancel">Отмена</a></p>
+      </div>
+    </form>
+  </section>
+
+  <!-- app -->
+  <section id="app-screen" class="app hidden">
+    <nav class="rail">
+      <button class="rail-btn active" data-view="agent" title="ИИ-агент"><img class="rail-ico" src="img/icons/agent.png" alt=""><span>Агент</span></button>
+      <button class="rail-btn" data-view="team" title="Команда агентов"><img class="rail-ico" src="img/icons/team.png" alt=""><span>Команда</span></button>
+      <button class="rail-btn" data-view="chat" title="Чат"><img class="rail-ico" src="img/icons/chat.png" alt=""><span>Чат</span></button>
+      <button class="rail-btn" data-view="tasks" title="Задачи"><img class="rail-ico" src="img/icons/tasks.png" alt=""><span>Задачи</span></button>
+      <button class="rail-btn" data-view="design" title="Оформление"><img class="rail-ico" src="img/icons/style.png" alt=""><span>Стиль</span></button>
+      <div class="grow"></div>
+      <button class="rail-btn" data-view="settings" title="Настройки"><img class="rail-ico" src="img/icons/settings.png" alt=""><span>Настройки</span></button>
+      <button class="rail-avatar" id="account-btn" title="Аккаунт"></button>
+    </nav>
+
+    <div id="account-menu" class="account-menu hidden">
+      <div class="am-head"><div class="am-avatar" id="am-avatar"></div><div><b id="am-name"></b><div class="muted small" id="am-email"></div><span class="am-role" id="am-role"></span></div></div>
+      <button class="am-item hidden" id="am-admin">⚙️ Админ-панель (откроется на сайте)</button>
+      <button class="am-item" id="am-site">🌐 Открыть сайт Mansur AI</button>
+      <button class="am-item" id="am-design">🎨 Оформление</button>
+      <button class="am-item am-danger" id="am-logout">⏻ Выйти из аккаунта</button>
+    </div>
+
+    <!-- agent -->
+    <main class="view" id="view-agent">
+      <header class="head">
+        <div>
+          <h1>ИИ-агент</h1>
+          <p class="muted small">Опишите задачу — свободный агент сам напишет код, сохранит файлы, запустит и проверит результат. Несколько агентов работают одновременно.</p>
+        </div>
+        <span class="pill" id="agent-pill">Готов</span>
+      </header>
+      <div id="team-bar" class="team-bar"></div>
+      <div class="agent-grid">
+        <div class="agent-left">
+          <textarea id="agent-prompt" class="input textarea" placeholder="Например: создай сайт-портфолио для фотографа с галереей и формой обратной связи, запусти его и открой в браузере"></textarea>
+          <label class="together" id="together">
+            <input type="checkbox" id="agent-together">
+            <span class="mini-team" id="together-team"></span>
+            <span><b>Вместе</b> — главный агент разделит задачу на части, команда сделает их одновременно, а он проверит итог</span>
+          </label>
+          <div class="ws-row">
+            <input id="agent-ws" class="input" placeholder="Рабочая папка (по умолчанию — новая папка в «Mansur AI Projects»)">
+            <button class="btn" id="agent-ws-pick" title="Выбрать папку">📁</button>
+          </div>
+          <div class="row">
+            <button class="btn btn-primary" id="agent-run">▶ Выполнить</button>
+            <button class="btn btn-danger hidden" id="agent-stop">■ Остановить всех</button>
+          </div>
+          <div class="examples">
+            <div class="muted small">Примеры:</div>
+            <button class="chip" data-ex="Создай одностраничный сайт кофейни с меню и картинкой, сгенерированной нейросетью. Запусти сайт и открой в браузере.">☕ Сайт кофейни</button>
+            <button class="chip" data-ex="Напиши на Python игру «Угадай число» в файле game.py и запусти тест, что файл без ошибок компилируется.">🎲 Игра на Python</button>
+            <button class="chip" data-ex="Покажи, сколько места занято на дисках компьютера, и сохрани отчёт в disk-report.txt.">💽 Отчёт о дисках</button>
+            <button class="chip" data-ex="Создай картинку логотипа Mansur AI и сохрани как logo.jpg, затем открой её.">🎨 Логотип</button>
+          </div>
+          <div class="note small muted">🔒 Опасные команды (удаление, изменение системы) выполняются только после вашего подтверждения. Режим можно изменить в настройках.</div>
+        </div>
+        <div class="agent-right">
+          <div class="log-head"><b>Журнал выполнения</b><button class="btn btn-sm" id="log-clear">Очистить</button></div>
+          <div id="agent-log" class="log"><div class="muted">Здесь появятся шаги агента: план, созданные файлы, команды и результаты.</div></div>
+          <div id="agent-result" class="result hidden"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- agent team -->
+    <main class="view hidden" id="view-team">
+      <header class="head">
+        <div><h1>Команда агентов</h1><p class="muted small">Каждый агент выполняет свою задачу — вместе они работают параллельно. Первый агент бесплатный, остальных можно добавить. Покупка разовая.</p></div>
+        <div class="team-dots" id="team-dots"></div>
+      </header>
+      <div class="stage-wrap team-stage"><canvas id="team-stage"></canvas><div class="stage-hint">Покрутите команду мышкой · агенты следят за курсором</div></div>
+      <div id="team-cards" class="team-grid"></div>
+    </main>
+
+    <!-- chat -->
+    <main class="view hidden" id="view-chat">
+      <div class="chat-layout">
+        <aside class="chat-side">
+          <button class="btn btn-primary btn-block" id="chat-new">＋ Новый чат</button>
+          <input class="input" id="chat-q" placeholder="🔎 Поиск">
+          <div id="chat-list" class="chat-list"></div>
+        </aside>
+        <section class="chat-main">
+          <header class="chat-head">
+            <b id="chat-title">Новый чат</b>
+            <span class="small muted" id="chat-limit"></span>
+            <select class="input select" id="chat-model"></select>
+          </header>
+          <div id="chat-msgs" class="chat-msgs"></div>
+          <div class="composer">
+            <textarea id="chat-input" class="input" rows="1" placeholder="Спросите что-нибудь… (Enter — отправить)"></textarea>
+            <button class="btn btn-primary" id="chat-send">➤</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- tasks -->
+    <main class="view hidden" id="view-tasks">
+      <header class="head">
+        <div><h1>Задачи</h1><p class="muted small">Все задачи аккаунта — и созданные здесь, и отправленные с сайта.</p></div>
+        <button class="btn" id="tasks-refresh">↻ Обновить</button>
+      </header>
+      <div id="tasks-list"></div>
+    </main>
+
+    <!-- design -->
+    <main class="view hidden" id="view-design">
+      <header class="head"><div><h1>Оформление</h1><p class="muted small">Тема, фон из фото, GIF или видео, цвета кнопок и шрифт. Сохраняется в аккаунте — будет и на сайте.</p></div></header>
+      <div id="design-box"></div>
+    </main>
+
+    <!-- settings -->
+    <main class="view hidden" id="view-settings">
+      <header class="head"><div><h1>Настройки</h1><p class="muted small" id="set-user"></p></div></header>
+      <div class="card">
+        <label class="field"><span>Адрес сервера Mansur AI</span><input class="input" id="set-server"></label>
+        <label class="field"><span>Папка для проектов агента</span>
+          <div class="ws-row"><input class="input" id="set-dir"><button class="btn" id="set-dir-pick">📁</button></div></label>
+        <label class="field"><span>Режим автономности</span>
+          <select class="input select" id="set-autonomy">
+            <option value="ask">Спрашивать перед опасными командами (рекомендуется)</option>
+            <option value="full">Полная автономия (подтверждать только удаление)</option>
+          </select></label>
+        <label class="check"><input type="checkbox" id="set-full"> Полный доступ к файлам вне рабочей папки</label>
+        <label class="check"><input type="checkbox" id="set-site"> Автоматически выполнять задачи, отправленные с сайта</label>
+        <label class="field" style="margin-top:12px"><span>Масштаб интерфейса: <b id="set-zoom-val">100%</b> (также Ctrl + / Ctrl − / Ctrl 0)</span>
+          <input type="range" id="set-zoom" min="70" max="160" step="5" value="100" style="width:100%;accent-color:var(--accent)"></label>
+        <div class="row" style="margin-top:16px"><button class="btn btn-primary" id="set-save">Сохранить</button><button class="btn btn-danger" id="set-logout">Выйти из аккаунта</button></div>
+        <p class="muted small" id="set-version"></p>
+      </div>
+    </main>
+  </section>
+</div>
+
+<div id="modal" class="overlay hidden"><div class="modal"><h2>⚠ Подтвердите действие</h2><pre id="modal-text"></pre>
+  <div class="row end"><button class="btn" id="modal-no">Запретить</button><button class="btn btn-primary" id="modal-yes">Разрешить</button></div></div></div>
+<div id="agent-dock" class="agent-dock hidden"></div>
+<div id="buy-modal" class="overlay hidden"><div class="modal buy-agent" id="buy-box"></div></div>
+<div id="toasts"></div>
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="theme.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

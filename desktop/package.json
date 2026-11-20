@@ -1,0 +1,48 @@
+{
+  "name": "mansur-ai",
+  "productName": "Mansur AI",
+  "version": "1.8.3",
+  "description": "Mansur AI — ИИ-агент для Windows",
+  "author": "Mansur AI",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "build": {
+    "appId": "ai.mansur.desktop",
+    "productName": "Mansur AI",
+    "artifactName": "MansurAI-Setup.exe",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "agent.js",
+      "tools.js",
+      "site-inspector.js",
+      "docx-writer.js",
+      "renderer/**",
+      "assets/**",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Mansur AI"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "docx": "^9.5.1"
+  }
+}

@@ -1,0 +1,76 @@
+/* Mansur AI — design engine styles shared by the website and the Windows app */
+body { font-family: var(--font, "Manrope", "Segoe UI", system-ui, sans-serif); }
+.btn-primary { color: var(--on-accent, #fff) !important; }
+
+/* ---------- background layer ---------- */
+#mt-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+#mt-bg[hidden] { display: none; }
+#mt-bg .mt-bg-media, #mt-bg .mt-bg-dim { position: absolute; inset: 0; }
+#mt-bg img, #mt-bg video { width: 100%; height: 100%; object-fit: cover; display: block; }
+#mt-bg .mt-bg-media { transition: filter .4s, transform .4s; }
+html.mt-has-bg, html.mt-has-bg body { background: transparent !important; }
+html.mt-has-bg {
+  --bg: rgba(8, 10, 16, .25); --bg-2: rgba(12, 14, 22, .55); --panel: rgba(20, 24, 36, .55); --panel-2: rgba(30, 36, 52, .6);
+  --line: rgba(255, 255, 255, .12); --text: #f4f6fb; --muted: #c3c9d9;
+}
+html.mt-has-bg :is(.app, .layout, .main, .messages, .page, .view, .chat-main) { background: transparent; }
+html.mt-glass :is(.sidebar, .card, .composer-box, .modal, .topbar, .nav, .rail, .login-card, .chat-side, .task, .template, .stat, .chip, .download, .toast, .titlebar, .mt-sec, .result, .seg) {
+  -webkit-backdrop-filter: blur(16px) saturate(1.35); backdrop-filter: blur(16px) saturate(1.35);
+}
+html.mt-has-bg :is(.log, .terminal) { background: rgba(5, 7, 12, .72); }
+
+/* ---------- editor ---------- */
+.mt-editor { display: flex; flex-direction: column; gap: 14px; max-width: 820px; }
+.mt-sec { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius, 14px); padding: 16px 18px; transition: opacity .25s; }
+.mt-sec h3 { margin: 0 0 12px; font-size: 15px; }
+.mt-dim-sec { opacity: .5; }
+.mt-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.mt-themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mt-theme { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel-2); cursor: pointer; color: var(--text); font-weight: 600; }
+.mt-theme.on { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.mt-theme-prev { width: 100%; height: 64px; border-radius: 9px; display: grid; place-items: center; font-size: 24px; }
+.mt-prev-dark { background: linear-gradient(160deg, #0b0d14, #1d2230); }
+.mt-prev-light { background: linear-gradient(160deg, #ffffff, #e6e9f2); }
+.mt-prev-custom { background: linear-gradient(135deg, #ff6b6b, #7c5cff 50%, #22d3ee); }
+.mt-drop { border: 2px dashed var(--line); border-radius: 14px; min-height: 150px; display: grid; place-items: center; cursor: pointer; overflow: hidden; transition: border-color .2s, background .2s; color: var(--muted); text-align: center; }
+.mt-drop.over, .mt-drop:hover { border-color: var(--accent); background: var(--accent-soft); }
+.mt-drop-prev { width: 100%; height: 100%; display: grid; place-items: center; }
+.mt-drop-prev img, .mt-drop-prev video { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+.mt-slider { display: grid; grid-template-columns: 110px 1fr 54px; gap: 10px; align-items: center; margin-top: 10px; font-size: 14px; }
+.mt-slider input { accent-color: var(--accent); }
+.mt-check { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; }
+.mt-check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.mt-presets, .mt-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.mt-swatches { margin: 6px 0 12px; }
+.mt-preset, .mt-swatch { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .5); cursor: pointer; box-shadow: 0 3px 10px rgba(0, 0, 0, .25); }
+.mt-swatch { border-radius: 10px; }
+.mt-suggest { margin-bottom: 6px; }
+.mt-color { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.mt-color input { width: 42px; height: 32px; border: 0; padding: 0; background: none; cursor: pointer; }
+.mt-fonts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.mt-font { text-align: left; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 16px; font-weight: 700; }
+.mt-font small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.mt-font.on { border-color: var(--accent); }
+.mt-actions { justify-content: flex-end; position: sticky; bottom: 0; padding: 10px 0; }
+
+/* ---------- animations ---------- */
+:root { --spring: cubic-bezier(.2, .9, .25, 1.15); --ease: cubic-bezier(.25, .8, .25, 1); }
+.btn, .mt-theme, .mt-font, .mt-preset, .mt-swatch, .chip, .template, .rail-btn, .side-link, .chat-item {
+  transition: transform .18s var(--spring), box-shadow .2s, border-color .2s, background .2s, filter .2s;
+}
+.btn:hover:not(:disabled), .mt-preset:hover, .mt-swatch:hover { transform: translateY(-1px); }
+.btn-primary:hover:not(:disabled) { box-shadow: 0 6px 22px var(--accent-soft), 0 2px 8px rgba(0, 0, 0, .25); }
+.btn:active:not(:disabled), .mt-theme:active, .mt-font:active, .chip:active, .template:active, .rail-btn:active { transform: scale(.95); }
+.mt-preset:hover, .mt-swatch:hover { transform: scale(1.12); }
+@keyframes mt-pop { from { opacity: 0; transform: scale(.94) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mt-fade { from { opacity: 0; } }
+@keyframes mt-up { from { opacity: 0; transform: translateY(10px); } }
+@keyframes mt-in-right { from { opacity: 0; transform: translateX(30px) scale(.96); } }
+.overlay { animation: mt-fade .2s var(--ease); }
+.modal { animation: mt-pop .32s var(--spring); }
+.toast { animation: mt-in-right .35s var(--spring); }
+.msg, .task, .chat-item, .log > div { animation: mt-up .3s var(--ease) both; }
+.mt-enter { animation: mt-pop .34s var(--spring) both; }
+.mt-enter-soft { animation: mt-up .3s var(--ease) both; }
+html.mt-no-anim *, html.mt-no-anim *::before, html.mt-no-anim *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
